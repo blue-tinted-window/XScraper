@@ -74,6 +74,9 @@ namespace WP_Plugin_Downloader
                 saveLocation = Directory.GetCurrentDirectory() + "/wp_dump/";
             }
 
+            if (!Directory.Exists(saveLocation)) {
+                Directory.CreateDirectory(saveLocation);
+            }
             for (uint ctr = startPage; ctr < stopPage; ctr++) {
                 int workerThreads;
                 int portThreads;
@@ -103,9 +106,7 @@ namespace WP_Plugin_Downloader
                             WriteLine(form, "Found " + node.Attributes["href"].Value + " in page " + page);
                         }
                         foreach (string link in nodelist) {
-                            form.Invoke(new MethodInvoker(() => { //start new thread from parent UI thread
-                                ScrapeDownloadLocation(form, link, dir);
-                            }));
+                            ScrapeDownloadLocation(form, link, dir);
                         }
                     }
                 } catch (Exception) {
@@ -115,30 +116,32 @@ namespace WP_Plugin_Downloader
         }
 
         private void ScrapeDownloadLocation(ScraperForm form, string url, string dir) {
-            ThreadPool.QueueUserWorkItem(new WaitCallback((object method0val) => {
-                HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
-                using (WebClient client = new WebClient()) {
-                    client.Headers[HttpRequestHeader.UserAgent] = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1468.0 Safari/537.36";
-                    doc.LoadHtml(client.DownloadString(url));
-                    if (!(Directory.Exists(Directory.GetCurrentDirectory() + "/downloads/"))) {
-                        Directory.CreateDirectory(Directory.GetCurrentDirectory() + "/downloads/");
-                    }
-                    foreach (HtmlNode node in doc.DocumentNode.SelectNodes("//p[@class='button']/a[@itemprop='downloadUrl']")) {
-                        string link = node.Attributes["href"].Value;
-                        try {
-                            client.DownloadFile(link, dir);
-                            WriteLine(form, "Successfully downloaded " + link + "!");
-                        } catch (Exception) {
-                            WriteLine(form, "Failed to download " + link);
-                        }
-                    }
+            HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
+            using (WebClient client = new WebClient()) {
+                client.Headers[HttpRequestHeader.UserAgent] = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1468.0 Safari/537.36";
+                doc.LoadHtml(client.DownloadString(url));
+                foreach (HtmlNode node in doc.DocumentNode.SelectNodes("//p[@class='button']/a[@itemprop='downloadUrl']")) {
+                    string link = node.Attributes["href"].Value;
+                    DownloadFile(form, link, dir + "/" + (link.Substring(link.LastIndexOf('/'))), client);
                 }
-            }));
+            }
+        }
+
+        private void DownloadFile(ScraperForm form, string location, string dlloc, WebClient wClient) {
+            wClient.DownloadFileCompleted += new AsyncCompletedEventHandler(
+                (object o, AsyncCompletedEventArgs e) => {
+                    WriteLine(form, "Successfully downloaded " + location + "!");
+            });
+            wClient.DownloadFileAsync(new Uri(location), dlloc);
         }
 
 
         private void WriteLine(ScraperForm form, string text) {
-            form.OutputText(text);
+            try {
+                form.OutputText(text);
+            } catch (Exception) {
+                Console.WriteLine("[" + DateTime.Now + "] - " + text);
+            }
         }
 
         private void OnThreadStartEvent() {
