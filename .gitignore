@@ -36,3 +36,16 @@
 Icon?
 ehthumbs.db
 Thumbs.db
+
+# Fucking gay visual studio files #
+###################################
+*.cache
+*.resources
+*.tlog
+*.pdb
+*.manifest
+
+# Fucking gay scraper files #
+#############################
+*.pcfg
+
